@@ -19,6 +19,7 @@ fn main() {
     engine::renderer::main_loop(ecs, |ecs, delta_time| {
         position!(ecs, light).x = time.sin();
 
+
         time += delta_time;
     });
 }

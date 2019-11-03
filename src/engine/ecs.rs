@@ -22,6 +22,7 @@ impl_getter!(position);
 impl_getter!(rotation);
 impl_getter!(light);
 impl_getter!(velocity);
+impl_getter!(polygon);
 
 #[derive(Clone, Copy)]
 pub enum Gen {

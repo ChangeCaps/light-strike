@@ -70,7 +70,7 @@ vec2 ray_polygon(vec2 ray_origin, vec2 ray_direction, int start, int count, floa
     }
 }
 
-vec4 apply_shadows(vec4 c) {
+vec3 apply_shadows(vec3 c) {
     vec2 pos = (gl_FragCoord.xy/resolution) * 2.0 - 1.0;
 
     float dist = -1.0;
@@ -114,12 +114,12 @@ vec4 apply_shadows(vec4 c) {
     if (lit) {
         return c / (pow(dist*20, 2));
     } else {
-        return vec4(0.0, 0.0, 0.0, 1.0);
+        return vec3(0.0, 0.0, 0.0);
     }
 }
 
 void main() {
     vec2 pos = (gl_FragCoord.xy/resolution) * 2.0 - 1.0;
 
-    color = apply_shadows(vec4(1.0));
+    color = vec4(apply_shadows(vec3(1.0)), 1.0);
 }
