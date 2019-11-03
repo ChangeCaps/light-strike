@@ -2,23 +2,25 @@
 
 out vec4 color;
 
-buffer object_lengths {
+buffer object_length_buffer {
     int object_length[];
 };
 
-buffer object_positions {
+buffer object_position_buffer {
     vec2 object_position[];
 };
 
-buffer light_positions {
+buffer light_position_buffer {
     vec2 light_position[];
 };
 
-buffer light_strengths {
-    vec4 light_strength[];
+buffer light_buffer {
+    vec4 lights[];
 };
 
 uniform vec2 resolution;
+uniform vec2 camera_position;
+uniform float camera_size;
 
 
 bool ray_line(vec2 ray_origin, vec2 ray_direction, vec2 line_0, vec2 line_1, float max_dist, out float dist) {
@@ -71,12 +73,10 @@ vec2 ray_polygon(vec2 ray_origin, vec2 ray_direction, int start, int count, floa
 }
 
 vec3 apply_shadows(vec3 c) {
-    vec2 pos = (gl_FragCoord.xy/resolution) * 2.0 - 1.0;
+    vec2 pos = (2.0 * gl_FragCoord.xy-resolution)/resolution.y * camera_size + camera_position;
 
-    float dist = -1.0;
     bool lit = false;
-
-    vec3 light_color = vec3(1.0); 
+ 
     vec3 col = vec3(0.0);
 
     for (int i = 0; i < light_position.length(); i++) {
@@ -85,7 +85,7 @@ vec3 apply_shadows(vec3 c) {
         int start = 0;
         bool hit_object = false;
 
-        vec2 ray_direction = normalize(light_position[i]-pos);
+        vec2 ray_direction = normalize(light_position[i] - pos);
 
         for (int j = 0; j < object_length.length(); j++) {
             int len = object_length[j];
@@ -104,23 +104,19 @@ vec3 apply_shadows(vec3 c) {
                 hit_object = true;
                 lit = true;
 
-                col += (0.01-clamp(smoothstep(0.0, 1.0, hit.y * pow(d*1, 2)), 0.0, 1.0)) * light_strength[i].yzw * c;
+                col += (0.01-clamp(smoothstep(0.0, 1.0, hit.y * pow(d*1, 1.5) / lights[i].x * 10.0), 0.0, 1.0)) * lights[i].yzw * c;
             }
         }
 
         if (!hit_object) {
             lit = true;
 
-            col += light_strength[i].yzw * c / pow(d / light_strength[i].x * 20, 2.0);
-
-            if (d * light_strength[i].x < dist || dist < 0.0) {
-                dist = d * light_strength[i].x;
-            }
+            col += lights[i].yzw * c / (pow(d, 2.0)/lights[i].x*20.0);
         }
     }
 
     if (lit) {
-        return clamp(col, 0.0, 0.4);
+        return col;
     } else {
         return vec3(0.0, 0.0, 0.0);
     }

@@ -21,7 +21,7 @@ glium::implement_vertex!(Vert, position);
 
 
 pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F) 
-    where F: FnMut(&mut ecs::ECS, &mut glium::glutin::EventsLoop, f32) -> bool
+    where F: FnMut(&mut ecs::ECS, &mut glium::glutin::EventsLoop, f32, (f32, f32)) -> (bool, Vector2, f32)
 {
     let mut events_loop = glium::glutin::EventsLoop::new();
 
@@ -56,105 +56,82 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
         include_str!("../vertex_shader.glsl"),
         include_str!("../fragment_shader.glsl"),
         None).expect("Failed to create program");
-
-
-    // Polygon getter
-    let (ecs_polygon_sender, reciever) = mpsc::channel::<Vec<Arc<Mutex<Option<Vec<Vector2>>>>>>();
-    let (polygon_position_sender, polygon_position_reciever) = mpsc::channel();
-    let (polygon_lengths_sender, polygon_lengths_reciever) = mpsc::channel();
-    thread::spawn(move || {
-        loop {
-            let ecs_polygons = reciever.recv();
-
-            if let Ok(ecs_polygons) = ecs_polygons {
-                let mut polygons = Vec::new();
-                let mut polygon_lengths = Vec::new();
-
-                for i in ecs_polygons {
-                    let i = i.lock().unwrap();
-
-                    if let Some(i) = &*i {
-                        polygon_lengths.push(i.len() as i32);                   
-
-                        for vert in i {
-                            polygons.push(<[f32; 2]>::from(vert.clone()));                
-                        }
-                    }
-                }
-
-                polygon_position_sender.send(polygons).unwrap();
-                polygon_lengths_sender.send(polygon_lengths).unwrap();
-            }
-        }
-    });
-
-
-    // Light getter
-    let (ecs_light_position_sender, light_position_reciever) = mpsc::channel::<Vec<Arc<Mutex<Option<Vector2>>>>>();
-    let (ecs_light_sender, light_receiver) = mpsc::channel::<Vec<Arc<Mutex<Option<(f32, f32, f32, f32)>>>>>();
-    let (light_positions_sender, light_positions_reciever) = mpsc::channel();
-    let (lights_sender, lights_reciever) = mpsc::channel();
-    thread::spawn(move || {
-        loop {
-            let ecs_light_positions = light_position_reciever.recv();
-
-            if let Ok(ecs_light_positions) = ecs_light_positions {
-                let ecs_lights = light_receiver.recv();
-
-                if let Ok(ecs_lights) = ecs_lights {
-                    let mut light_positions = Vec::new();
-                    let mut lights = Vec::new();
-
-                    for i in 0..ecs_light_positions.len() {
-                        let light = ecs_lights[i].lock().unwrap();
-                        let position = ecs_light_positions[i].lock().unwrap();
-
-                        if let Some(light) = &*light {
-                            if let Some(position) = &*position {
-                                light_positions.push([position.x, position.y]);
-                                lights.push([light.0, light.1, light.2, light.3]);
-                            }
-                        }
-                    }
-
-                    light_positions_sender.send(light_positions).unwrap();
-                    lights_sender.send(lights).unwrap();
-                }
-            }
-        }
-    });
-
-    
-
+ 
     let mut running = true; 
 
     let mut time = None;
 
+    let time_per_frame = std::time::Duration::from_millis(16);
+
     // Main Loop
     while running {
         let mut delta_time = 0.0;
-
+        
         if let Some(time) = time {
+            
+            let t = time_per_frame.checked_sub(Instant::now().duration_since(time));
+
+            if let Some(wait) = t {
+                thread::sleep(wait);
+            }
+
             delta_time = Instant::now().duration_since(time).as_micros() as f32 / 1_000_000.0;
         }
 
-        running = each_frame(&mut ecs, &mut events_loop, delta_time);
+        let res = display.get_framebuffer_dimensions();
+
+        let output = each_frame(&mut ecs, &mut events_loop, delta_time, (res.0 as f32, res.1 as f32));
+
+        running = output.0;
+
+        let camera_position = output.1;
+        let camera_size = output.2;
 
         time = Some(Instant::now());
 
         let mut frame = display.draw();
 
-        let res = display.get_framebuffer_dimensions();
 
-        ecs_polygon_sender.send(ecs.polygon.clone()).unwrap();
-        
-        ecs_light_sender.send(ecs.light.clone()).unwrap();
-        ecs_light_position_sender.send(ecs.position.clone()).unwrap();
+        //
+        // Updates on components
+        //
 
-        let polygons = polygon_position_reciever.recv().unwrap();
-        let polygon_lengths = polygon_lengths_reciever.recv().unwrap();
-        let light_positions = light_positions_reciever.recv().unwrap();
-        let lights = lights_reciever.recv().unwrap();
+        for i in 0..ecs.len() {
+            if let Some(pos) = &mut ecs.position[i] {
+                if let Some(vel) = ecs.velocity[i] {
+                    *pos += vel.mul(delta_time);
+                }
+            }
+        }
+
+        //
+        // Get entities for rendering
+        //
+
+        let mut polygons = Vec::new();
+        let mut polygon_lengths = Vec::new();
+
+        for i in &ecs.polygon {
+            if let Some(polygon) = i {
+                for i in polygon {
+                    polygons.push(i.arr());
+                }
+
+                polygon_lengths.push(polygon.len() as i32);
+            }
+        }
+
+        let mut light_positions = Vec::new();
+        let mut lights = Vec::new();
+
+        for i in 0..ecs.len() {
+            if let Some(light_position) = ecs.position[i] {
+                if let Some(light) = ecs.light[i] {
+                    light_positions.push(light_position.arr());
+                    lights.push([light.0, light.1, light.2, light.3]);
+                }
+            }
+        }
 
         //println!("{:?}\n{:?}\n", polygons, polygon_lengths);
         //println!("{:?}", lights);
@@ -167,10 +144,12 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
 
         let uniforms = uniform!{
             resolution: [res.0 as f32, res.1 as f32],
-            object_lengths: &object_lengths,
-            object_positions: &object_positions,
-            light_positions: &light_positions,
-            light_strengths: &lights,
+            camera_position: <[f32; 2]>::from(camera_position),
+            camera_size: camera_size,
+            object_length_buffer: &object_lengths,
+            object_position_buffer: &object_positions,
+            light_position_buffer: &light_positions,
+            light_buffer: &lights,
         };
 
         frame.draw(&vertex_buffer, &index_buffer, 

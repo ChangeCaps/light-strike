@@ -3,26 +3,16 @@ use std::sync::{Arc, Mutex};
 
 
 macro_rules! impl_getter {
-    ($func_name:ident) => {
-        macro_rules! $func_name {
-            ($ecs:expr, $id:expr) => {
-                {
-                    if !$ecs.valid_id($id) {
-                        panic!();
-                    } 
+    ($func_name:ident, $return_type:ty) => {
+        pub fn $func_name(&mut self, id: ID) -> Option<&mut $return_type> {
+            if self.valid_id(id) {
+                return self.$func_name[id.index].as_mut();
+            }
 
-                    $ecs.$func_name[$id.index()].lock().unwrap().as_mut().unwrap()
-                }
-            };
+            panic!("Invalid ID");
         }
     }
 }
-
-impl_getter!(position);
-impl_getter!(rotation);
-impl_getter!(light);
-impl_getter!(velocity);
-impl_getter!(polygon);
 
 #[derive(Clone, Copy, Debug)]
 pub enum Gen {
@@ -53,14 +43,15 @@ pub enum ECSError {
 }
 
 pub struct ECS {
-    pub polygon: Vec<Arc<Mutex<Option<Vec<Vector2>>>>>,
-    pub position: Vec<Arc<Mutex<Option<Vector2>>>>,
-    pub rotation: Vec<Arc<Mutex<Option<f32>>>>,
-    pub light: Vec<Arc<Mutex<Option<(f32, f32, f32, f32)>>>>,
-    pub velocity: Vec<Arc<Mutex<Option<Vector2>>>>,
+    pub polygon: Vec<Option<Vec<Vector2>>>,
+    pub position: Vec<Option<Vector2>>,
+    pub rotation: Vec<Option<f32>>,
+    pub light: Vec<Option<(f32, f32, f32, f32)>>,
+    pub velocity: Vec<Option<Vector2>>,
     pub gen: Vec<Gen>,
     last: Option<usize>,
     next_gen: u64,
+    len: usize,
 }
 
 impl ECS {
@@ -74,6 +65,7 @@ impl ECS {
             gen: Vec::new(),
             last: None,
             next_gen: 0,
+            len: 0,
         }
     }  
 
@@ -84,11 +76,11 @@ impl ECS {
         polygon: Option<Vec<Vector2>>) -> ID 
         {
         if let Some(last) = self.last {
-            self.polygon[last] = Arc::new(Mutex::new(polygon));
-            self.position[last] = Arc::new(Mutex::new(position));
-            self.rotation[last] = Arc::new(Mutex::new(rotation));
-            self.light[last] = Arc::new(Mutex::new(light));
-            self.velocity[last] = Arc::new(Mutex::new(velocity));
+            self.polygon[last] = polygon;
+            self.position[last] = position;
+            self.rotation[last] = rotation;
+            self.light[last] = light;
+            self.velocity[last] = velocity;
 
             self.last = self.gen[last].unwrap_none();
 
@@ -100,22 +92,24 @@ impl ECS {
         let index = self.gen.len();
 
         self.gen.push(Gen::Some(self.next_gen));
-        self.polygon.push(Arc::new(Mutex::new(polygon)));
-        self.position.push(Arc::new(Mutex::new(position)));
-        self.rotation.push(Arc::new(Mutex::new(rotation)));
-        self.light.push(Arc::new(Mutex::new(light)));
-        self.velocity.push(Arc::new(Mutex::new(velocity)));
+        self.polygon.push(polygon);
+        self.position.push(position);
+        self.rotation.push(rotation);
+        self.light.push(light);
+        self.velocity.push(velocity);
+
+        self.len += 1;
 
         return ID::new(index, self.next_gen);
     }
 
     pub fn remove(&mut self, id: ID) -> Result<(), ECSError> {
         if self.valid_id(id) {
-            *self.polygon[id.index].lock().unwrap() = None;
-            *self.position[id.index].lock().unwrap() = None;
-            *self.rotation[id.index].lock().unwrap() = None;
-            *self.light[id.index].lock().unwrap() = None;
-            *self.velocity[id.index].lock().unwrap() = None;
+            self.polygon[id.index] = None;
+            self.position[id.index] = None;
+            self.rotation[id.index] = None;
+            self.light[id.index] = None;
+            self.velocity[id.index] = None;
 
             if let Gen::Some(last) = self.gen[id.index] {
                 if last >= self.next_gen {
@@ -139,6 +133,16 @@ impl ECS {
 
         return false;
     }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    impl_getter!(position, Vector2);
+    impl_getter!(rotation, f32);
+    impl_getter!(light, (f32, f32, f32, f32));
+    impl_getter!(velocity, Vector2);
+    impl_getter!(polygon, Vec<Vector2>);
 }
 
 

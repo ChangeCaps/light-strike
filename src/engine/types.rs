@@ -53,8 +53,48 @@ impl Vector2 {
         }
     }
 
+    pub fn arr(self) -> [f32; 2] {
+        <[f32; 2]>::from(self)
+    }
+
     pub fn len(&self) -> f32 {
         (self.x.powi(2) + self.y.powi(2)).sqrt()
+    }
+
+    pub fn normalize(self) -> Vector2 {
+        if self.len() == 0.0 {
+            return Vector2::new(0.0, 0.0);
+        }
+
+        self.div(self.len())
+    }
+
+    pub fn add(self, val: f32) -> Vector2 {
+        Vector2 {
+            x: self.x + val,
+            y: self.y + val,
+        }
+    }
+
+    pub fn sub(self, val: f32) -> Vector2 {
+        Vector2 {
+            x: self.x - val,
+            y: self.y - val,
+        }
+    }
+
+    pub fn mul(self, val: f32) -> Vector2 {
+        Vector2 {
+            x: self.x * val,
+            y: self.y * val,
+        }
+    }
+
+    pub fn div(self, val: f32) -> Vector2 {
+        Vector2 {
+            x: self.x / val,
+            y: self.y / val,
+        }
     }
 }
 
