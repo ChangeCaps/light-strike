@@ -15,7 +15,7 @@ buffer light_positions {
 };
 
 buffer light_strengths {
-    float light_strength[];
+    vec4 light_strength[];
 };
 
 uniform vec2 resolution;
@@ -76,6 +76,9 @@ vec3 apply_shadows(vec3 c) {
     float dist = -1.0;
     bool lit = false;
 
+    vec3 light_color = vec3(1.0); 
+    vec3 col = vec3(0.0);
+
     for (int i = 0; i < light_position.length(); i++) {
         float d = length(light_position[i]-pos);
 
@@ -98,21 +101,26 @@ vec3 apply_shadows(vec3 c) {
             if (hit.x == 1) {
                 hit_object = true;
             } else if (hit.x == 2) {
-                return c * (0.01-clamp(smoothstep(0.0, 1.0, hit.y * pow(d*1, 2)), 0.0, 1.0));
+                hit_object = true;
+                lit = true;
+
+                col += (0.01-clamp(smoothstep(0.0, 1.0, hit.y * pow(d*1, 2)), 0.0, 1.0)) * light_strength[i].yzw * c;
             }
         }
 
         if (!hit_object) {
             lit = true;
 
-            if (d < dist || dist < 0.0) {
-                dist = d;
+            col += light_strength[i].yzw * c / pow(d / light_strength[i].x * 20, 2.0);
+
+            if (d * light_strength[i].x < dist || dist < 0.0) {
+                dist = d * light_strength[i].x;
             }
         }
     }
 
     if (lit) {
-        return c / (pow(dist*20, 2));
+        return clamp(col, 0.0, 0.4);
     } else {
         return vec3(0.0, 0.0, 0.0);
     }

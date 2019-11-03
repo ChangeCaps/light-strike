@@ -53,7 +53,7 @@ pub struct ECS {
     pub polygon: Vec<Arc<Mutex<Option<Vec<Vector2>>>>>,
     pub position: Vec<Arc<Mutex<Option<Vector2>>>>,
     pub rotation: Vec<Arc<Mutex<Option<f32>>>>,
-    pub light: Vec<Arc<Mutex<Option<f32>>>>,
+    pub light: Vec<Arc<Mutex<Option<(f32, f32, f32, f32)>>>>,
     pub velocity: Vec<Arc<Mutex<Option<Vector2>>>>,
     gen: Vec<Gen>,
     last: Option<usize>,
@@ -76,7 +76,7 @@ impl ECS {
 
     pub fn push(&mut self, position: Option<Vector2>, 
         rotation: Option<f32>, 
-        light: Option<f32>, 
+        light: Option<(f32, f32, f32, f32)>, 
         velocity: Option<Vector2>, 
         polygon: Option<Vec<Vector2>>) -> ID 
         {

@@ -21,7 +21,7 @@ glium::implement_vertex!(Vert, position);
 
 
 pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F) 
-    where F: FnMut(&mut ecs::ECS, f32) -> ()
+    where F: FnMut(&mut ecs::ECS, &mut glium::glutin::EventsLoop, f32) -> bool
 {
     let mut events_loop = glium::glutin::EventsLoop::new();
 
@@ -88,7 +88,7 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
 
     // Light getter
     let (ecs_light_position_sender, light_position_reciever) = mpsc::channel::<Vec<Arc<Mutex<Option<Vector2>>>>>();
-    let (ecs_light_sender, light_receiver) = mpsc::channel::<Vec<Arc<Mutex<Option<f32>>>>>();
+    let (ecs_light_sender, light_receiver) = mpsc::channel::<Vec<Arc<Mutex<Option<(f32, f32, f32, f32)>>>>>();
     let (light_positions_sender, light_positions_reciever) = mpsc::channel();
     let (lights_sender, lights_reciever) = mpsc::channel();
     thread::spawn(move || {
@@ -106,7 +106,7 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
                 if let Some(light) = &*light {
                     if let Some(position) = &*position {
                         light_positions.push([position.x, position.y]);
-                        lights.push(*light);
+                        lights.push([light.0, light.1, light.2, light.3]);
                     }
                 }
             }
@@ -122,8 +122,6 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
 
     let mut time = None;
 
-    let mut t: f32 = 0.0;
-
     // Main Loop
     while running {
         let mut delta_time = 0.0;
@@ -134,7 +132,7 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
             print!("\r{:?}             ", Instant::now().duration_since(time));
         }
 
-        each_frame(&mut ecs, delta_time);
+        running = each_frame(&mut ecs, &mut events_loop, delta_time);
 
         time = Some(Instant::now());
 
@@ -150,7 +148,7 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
         let polygons = polygon_position_reciever.recv().unwrap();
         let polygon_lengths = polygon_lengths_reciever.recv().unwrap();
         let light_positions = light_positions_reciever.recv().unwrap();
-        let light_strengths = lights_reciever.recv().unwrap();
+        let lights = lights_reciever.recv().unwrap();
 
         //println!("{:?}\n{:?}\n", polygons, polygon_lengths);
         //println!("{:?}", lights);
@@ -158,7 +156,7 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
         let object_lengths = glium::buffer::Buffer::<[i32]>::new(&display, &polygon_lengths, glium::buffer::BufferType::ArrayBuffer, glium::buffer::BufferMode::Default).unwrap();
         let object_positions = glium::buffer::Buffer::<[[f32; 2]]>::new(&display, &polygons, glium::buffer::BufferType::ArrayBuffer, glium::buffer::BufferMode::Default).unwrap();
         let light_positions = glium::buffer::Buffer::<[[f32; 2]]>::new(&display, &light_positions, glium::buffer::BufferType::ArrayBuffer, glium::buffer::BufferMode::Default).unwrap();
-        let light_strengths = glium::buffer::Buffer::<[f32]>::new(&display, &light_strengths, glium::buffer::BufferType::ArrayBuffer, glium::buffer::BufferMode::Default).unwrap();
+        let lights = glium::buffer::Buffer::<[[f32; 4]]>::new(&display, &lights, glium::buffer::BufferType::ArrayBuffer, glium::buffer::BufferMode::Default).unwrap();
 
 
         let uniforms = uniform!{
@@ -166,7 +164,7 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
             object_lengths: &object_lengths,
             object_positions: &object_positions,
             light_positions: &light_positions,
-            light_strengths: &light_strengths,
+            light_strengths: &lights,
         };
 
         frame.draw(&vertex_buffer, &index_buffer, 
