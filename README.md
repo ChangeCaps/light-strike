@@ -9,3 +9,5 @@ The engine is based on a Data Oriented Design with an Entity Component System
 for optimal CPU utilization.
 
 It is currently very early in devlopment. Any contributions are greatly appreciated!
+
+![Image](current.PNG)
