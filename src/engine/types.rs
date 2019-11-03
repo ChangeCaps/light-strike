@@ -74,6 +74,12 @@ impl From<Vector2> for (f32, f32) {
     }
 }
 
+impl From<Vector2> for [f32; 2] {
+    fn from(vector: Vector2) -> Self {
+        [vector.x, vector.y]
+    }
+}
+
 
 impl_op!(Add, add, +);
 impl_op!(Sub, sub, -);

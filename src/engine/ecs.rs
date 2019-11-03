@@ -1,39 +1,37 @@
 use super::types::*;
+use std::sync::{Arc, Mutex};
+
 
 macro_rules! impl_getter {
-    ($func_name:ident, $func_name_mut:ident, $return_type:ident) => {
-        fn $func_name(&self, id: ID) -> Option<&$return_type> {
-            if self.valid_id(id) {
-                if let Some(some) = &self.$func_name[id.index] { 
-                    return Some(some);
+    ($func_name:ident) => {
+        macro_rules! $func_name {
+            ($ecs:expr, $id:expr) => {
+                {
+                    if ecs.valid_id($id) {
+                        return ecs.$func_name[$id.index].lock().un;
+                    } 
+
+                    
                 }
-            }
-
-            return None;
-        }
-
-        fn $func_name_mut(&mut self, id: ID) -> Option<&mut $return_type> {
-            if self.valid_id(id) {
-                if let Some(some) = &mut self.$func_name[id.index] { 
-                    return Some(some);
-                }
-            }
-
-            return None;        
+            };
         }
     }
 }
 
+impl_getter!(position);
+impl_getter!(rotation);
+impl_getter!(light);
+impl_getter!(velocity);
 
 #[derive(Clone, Copy)]
-pub enum Component {
+pub enum Gen {
     Some(u64),
     None(Option<usize>),
 } 
 
-impl Component {
+impl Gen {
     pub fn unwrap_some(self) -> u64 {
-        if let Component::Some(some) = self {
+        if let Gen::Some(some) = self {
             return some;
         } else {
             panic!("The component contained None");
@@ -41,7 +39,7 @@ impl Component {
     }
 
     pub fn unwrap_none(self) -> Option<usize> {
-        if let Component::None(none) = self {
+        if let Gen::None(none) = self {
             return none;
         } else {
             panic!("The component contained Some");
@@ -51,9 +49,12 @@ impl Component {
 
 
 pub struct ECS {
-    pub position: Vec<Option<Vector2>>,
-    pub rotation: Vec<Option<f32>>,
-    gen: Vec<Component>,
+    pub polygon: Vec<Arc<Mutex<Option<Vec<Vector2>>>>>,
+    pub position: Vec<Arc<Mutex<Option<Vector2>>>>,
+    pub rotation: Vec<Arc<Mutex<Option<f32>>>>,
+    pub light: Vec<Arc<Mutex<Option<f32>>>>,
+    pub velocity: Vec<Arc<Mutex<Option<Vector2>>>>,
+    gen: Vec<Gen>,
     last: Option<usize>,
     next_gen: u64,
 }
@@ -61,45 +62,56 @@ pub struct ECS {
 impl ECS {
     pub fn new() -> ECS {
         ECS {
+            polygon: Vec::new(),
             position: Vec::new(),
             rotation: Vec::new(),
+            light: Vec::new(),
+            velocity: Vec::new(),
             gen: Vec::new(),
             last: None,
             next_gen: 0,
         }
     }  
 
-    pub fn push(&mut self, position: Option<Vector2>, rotation: Option<f32>) -> ID {
+    pub fn push(&mut self, position: Option<Vector2>, 
+        rotation: Option<f32>, 
+        light: Option<f32>, 
+        velocity: Option<Vector2>, 
+        polygon: Option<Vec<Vector2>>) -> ID 
+        {
         if let Some(last) = self.last {
-            self.position[last] = position;
-            self.rotation[last] = rotation;
+            self.polygon[last] = Arc::new(Mutex::new(polygon));
+            self.position[last] = Arc::new(Mutex::new(position));
+            self.rotation[last] = Arc::new(Mutex::new(rotation));
+            self.light[last] = Arc::new(Mutex::new(light));
+            self.velocity[last] = Arc::new(Mutex::new(velocity));
 
             self.last = self.gen[last].unwrap_none();
 
-            self.gen[last] = Component::Some(self.next_gen);
+            self.gen[last] = Gen::Some(self.next_gen);
 
             return ID::new(last, self.next_gen);       
         }
 
         let index = self.gen.len();
 
-        self.gen.push(Component::Some(self.next_gen));
-        self.position.push(position);
-        self.rotation.push(rotation);
+        self.gen.push(Gen::Some(self.next_gen));
+        self.polygon.push(Arc::new(Mutex::new(polygon)));
+        self.position.push(Arc::new(Mutex::new(position)));
+        self.rotation.push(Arc::new(Mutex::new(rotation)));
+        self.light.push(Arc::new(Mutex::new(light)));
+        self.velocity.push(Arc::new(Mutex::new(velocity)));
 
         return ID::new(index, self.next_gen);
     }
 
-    fn valid_id(&self, id: ID) -> bool {
-        if let Component::Some(some) = self.gen[id.index] {
+    pub fn valid_id(&self, id: ID) -> bool {
+        if let Gen::Some(some) = self.gen[id.index] {
             return some == id.gen;
         }
 
         return false;
     }
-
-    impl_getter!(position, position_mut, Vector2);
-    impl_getter!(rotation, rotation_mut, f32);
 }
 
 
@@ -126,4 +138,3 @@ impl ID {
         self.gen
     }
 }
-
