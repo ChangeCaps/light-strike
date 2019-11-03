@@ -7,11 +7,11 @@ macro_rules! impl_getter {
         macro_rules! $func_name {
             ($ecs:expr, $id:expr) => {
                 {
-                    if ecs.valid_id($id) {
-                        return ecs.$func_name[$id.index].lock().un;
+                    if !$ecs.valid_id($id) {
+                        panic!();
                     } 
 
-                    
+                    $ecs.$func_name[$id.index()].lock().unwrap().as_mut().unwrap()
                 }
             };
         }

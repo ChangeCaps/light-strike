@@ -20,7 +20,9 @@ struct Vert {
 glium::implement_vertex!(Vert, position);
 
 
-pub fn main_loop<'a>(ecs: ecs::ECS, each_frame: dyn FnMut<Outout = None>) {
+pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F) 
+    where F: FnMut(&mut ecs::ECS, f32) -> ()
+{
     let mut events_loop = glium::glutin::EventsLoop::new();
 
     let wb = glium::glutin::WindowBuilder::new()
@@ -131,6 +133,8 @@ pub fn main_loop<'a>(ecs: ecs::ECS, each_frame: dyn FnMut<Outout = None>) {
 
             print!("\r{:?}             ", Instant::now().duration_since(time));
         }
+
+        each_frame(&mut ecs, delta_time);
 
         time = Some(Instant::now());
 
