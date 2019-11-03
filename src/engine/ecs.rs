@@ -24,7 +24,7 @@ impl_getter!(light);
 impl_getter!(velocity);
 impl_getter!(polygon);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Gen {
     Some(u64),
     None(Option<usize>),
@@ -48,6 +48,9 @@ impl Gen {
     }
 }
 
+pub enum ECSError {
+    InvalidID,
+}
 
 pub struct ECS {
     pub polygon: Vec<Arc<Mutex<Option<Vec<Vector2>>>>>,
@@ -55,7 +58,7 @@ pub struct ECS {
     pub rotation: Vec<Arc<Mutex<Option<f32>>>>,
     pub light: Vec<Arc<Mutex<Option<(f32, f32, f32, f32)>>>>,
     pub velocity: Vec<Arc<Mutex<Option<Vector2>>>>,
-    gen: Vec<Gen>,
+    pub gen: Vec<Gen>,
     last: Option<usize>,
     next_gen: u64,
 }
@@ -104,6 +107,29 @@ impl ECS {
         self.velocity.push(Arc::new(Mutex::new(velocity)));
 
         return ID::new(index, self.next_gen);
+    }
+
+    pub fn remove(&mut self, id: ID) -> Result<(), ECSError> {
+        if self.valid_id(id) {
+            *self.polygon[id.index].lock().unwrap() = None;
+            *self.position[id.index].lock().unwrap() = None;
+            *self.rotation[id.index].lock().unwrap() = None;
+            *self.light[id.index].lock().unwrap() = None;
+            *self.velocity[id.index].lock().unwrap() = None;
+
+            if let Gen::Some(last) = self.gen[id.index] {
+                if last >= self.next_gen {
+                    self.next_gen += 1;
+                }
+            }
+
+            self.gen[id.index] = Gen::None(self.last);
+            self.last = Some(id.index);
+
+            return Ok(());
+        }
+
+        Err(ECSError::InvalidID)
     }
 
     pub fn valid_id(&self, id: ID) -> bool {

@@ -14,7 +14,7 @@ fn main() {
     let mut ecs = engine::ecs::ECS::new();
 
     ecs.push(None, None, None, None, Some(vec![Vector2::new(-0.2, 0.2), Vector2::new(-0.2, 0.5), Vector2::new(0.2, 0.5), Vector2::new(0.2, 0.2)]));
-    ecs.push(None, None, None, None, Some(vec![Vector2::new(-0.2, -0.2), Vector2::new(0.0, -0.5), Vector2::new(0.2, -0.2)]));
+    let poly = ecs.push(None, None, None, None, Some(vec![Vector2::new(-0.2, -0.2), Vector2::new(0.0, -0.5), Vector2::new(0.2, -0.2)]));
     let light = ecs.push(Some(Vector2::new(0.0, 0.0)), None, Some((1.5, 1.0, 0.0, 1.0)), None, None);
     let light2 = ecs.push(Some(Vector2::new(0.0, 0.0)), None, Some((1.0, 0.0, 1.0, 0.0)), None, None);
 
@@ -23,7 +23,7 @@ fn main() {
     engine::renderer::main_loop(ecs, |ecs, events_loop, delta_time| {
         let mut running = true;
 
-        // Event handleing
+        // Event handeling
 
         events_loop.poll_events(|event| {
             match event {
@@ -44,7 +44,8 @@ fn main() {
         // Game logic
 
         position!(ecs, light).x = time.sin();
-        position!(ecs, light2).x = (time + 2.0).sin();
+        position!(ecs, light2).x = (time).sin();
+        position!(ecs, light2).y = time.cos();
 
 
         time += delta_time;

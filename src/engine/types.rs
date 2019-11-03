@@ -37,7 +37,7 @@ macro_rules! impl_assign_op {
 
 
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, Debug)]
 pub struct Vector2 {
     pub x: f32,
     pub y: f32,

@@ -64,24 +64,27 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
     let (polygon_lengths_sender, polygon_lengths_reciever) = mpsc::channel();
     thread::spawn(move || {
         loop {
-            let ecs_polygons = reciever.recv().unwrap();
-            let mut polygons = Vec::new();
-            let mut polygon_lengths = Vec::new();
+            let ecs_polygons = reciever.recv();
 
-            for i in ecs_polygons {
-                let i = i.lock().unwrap();
+            if let Ok(ecs_polygons) = ecs_polygons {
+                let mut polygons = Vec::new();
+                let mut polygon_lengths = Vec::new();
 
-                if let Some(i) = &*i {
-                    polygon_lengths.push(i.len() as i32);                   
+                for i in ecs_polygons {
+                    let i = i.lock().unwrap();
 
-                    for vert in i {
-                        polygons.push(<[f32; 2]>::from(vert.clone()));                
+                    if let Some(i) = &*i {
+                        polygon_lengths.push(i.len() as i32);                   
+
+                        for vert in i {
+                            polygons.push(<[f32; 2]>::from(vert.clone()));                
+                        }
                     }
                 }
-            }
 
-            polygon_position_sender.send(polygons).unwrap();
-            polygon_lengths_sender.send(polygon_lengths).unwrap();
+                polygon_position_sender.send(polygons).unwrap();
+                polygon_lengths_sender.send(polygon_lengths).unwrap();
+            }
         }
     });
 
@@ -93,26 +96,31 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
     let (lights_sender, lights_reciever) = mpsc::channel();
     thread::spawn(move || {
         loop {
-            let ecs_light_positions = light_position_reciever.recv().unwrap();
-            let ecs_lights = light_receiver.recv().unwrap();
+            let ecs_light_positions = light_position_reciever.recv();
 
-            let mut light_positions = Vec::new();
-            let mut lights = Vec::new();
+            if let Ok(ecs_light_positions) = ecs_light_positions {
+                let ecs_lights = light_receiver.recv();
 
-            for i in 0..ecs_light_positions.len() {
-                let light = ecs_lights[i].lock().unwrap();
-                let position = ecs_light_positions[i].lock().unwrap();
+                if let Ok(ecs_lights) = ecs_lights {
+                    let mut light_positions = Vec::new();
+                    let mut lights = Vec::new();
 
-                if let Some(light) = &*light {
-                    if let Some(position) = &*position {
-                        light_positions.push([position.x, position.y]);
-                        lights.push([light.0, light.1, light.2, light.3]);
+                    for i in 0..ecs_light_positions.len() {
+                        let light = ecs_lights[i].lock().unwrap();
+                        let position = ecs_light_positions[i].lock().unwrap();
+
+                        if let Some(light) = &*light {
+                            if let Some(position) = &*position {
+                                light_positions.push([position.x, position.y]);
+                                lights.push([light.0, light.1, light.2, light.3]);
+                            }
+                        }
                     }
+
+                    light_positions_sender.send(light_positions).unwrap();
+                    lights_sender.send(lights).unwrap();
                 }
             }
-
-            light_positions_sender.send(light_positions).unwrap();
-            lights_sender.send(lights).unwrap();
         }
     });
 
@@ -128,8 +136,6 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
 
         if let Some(time) = time {
             delta_time = Instant::now().duration_since(time).as_micros() as f32 / 1_000_000.0;
-
-            print!("\r{:?}             ", Instant::now().duration_since(time));
         }
 
         running = each_frame(&mut ecs, &mut events_loop, delta_time);
@@ -142,8 +148,8 @@ pub fn main_loop<F>(mut ecs: ecs::ECS, mut each_frame: F)
 
         ecs_polygon_sender.send(ecs.polygon.clone()).unwrap();
         
-        ecs_light_position_sender.send(ecs.position.clone()).unwrap();
         ecs_light_sender.send(ecs.light.clone()).unwrap();
+        ecs_light_position_sender.send(ecs.position.clone()).unwrap();
 
         let polygons = polygon_position_reciever.recv().unwrap();
         let polygon_lengths = polygon_lengths_reciever.recv().unwrap();
