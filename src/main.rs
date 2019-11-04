@@ -15,8 +15,17 @@ use engine::types::*;
 fn main() {
     let mut ecs = engine::ecs::ECS::new();
 
+    //
+    // Objects
+    //
+
     ecs.push(None, None, None, None, Some(vec![Vector2::new(-0.2, 0.2), Vector2::new(-0.2, 0.5), Vector2::new(0.2, 0.5), Vector2::new(0.2, 0.2)]));
     let poly = ecs.push(None, None, None, None, Some(vec![Vector2::new(-0.2, -0.2), Vector2::new(0.0, -0.5), Vector2::new(0.2, -0.2)]));
+
+
+    // 
+    // Game variables
+    //
 
     let mut player_trail: Vec<(engine::ecs::ID, f32)> = Vec::new();
     
@@ -81,8 +90,7 @@ fn main() {
                                     _ => (),
                                 }
                             }
-                        },
-                        _ => (),
+                        }, _ => (),
                     }
                 },
                 Event::DeviceEvent {event, ..} => {
